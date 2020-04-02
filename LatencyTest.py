@@ -116,9 +116,9 @@ def ScanDataFrameForOnSyncPattern(data_frame, sync_pattern):
             compString = dataRow['msgBody']['syncPattern']
 
             if(compString == sync_pattern):
-                print(f"Test Message Found for: {sync_pattern}");
+                print(f"Test Message Found for: {sync_pattern}")
                 returnValue = dataRow
-                stopSearch = True;
+                stopSearch = True
 
         dfDecrementer -= 1
 
@@ -212,5 +212,5 @@ if __name__=="__main__":
 
     # Write to log
     f = open("logger.txt", "a")
-    f.write(outString);
-    f.close();
+    f.write(outString)
+    f.close()
