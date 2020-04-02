@@ -56,11 +56,9 @@ def PostToUdl(udl_endpoint, username, unecrypted_password, json_data, http_sessi
                                       data = json.dumps(json_data),
                                       verify = False,
                                       headers = udl_headers)
+        print("Completed data access at {url}".format(url=udl_endpoint))
     except requests.exceptions.RequestException as e:
         print(f"ERROR ON POST:  {e}")
-
-    if response.ok:
-        print("Completed data access at {url}".format(url=udl_endpoint))
 
     return response
 
@@ -109,7 +107,7 @@ def GetFromUdl(url_endpoint, http_session, creds):
 def ScanDataFrameForOnSyncPattern(data_frame, sync_pattern):
     dfDecrementer = data_frame.shape[0] - 1    # Get amount of rows in the dataframe
     stopSearch = False
-    returnValue = None
+    returnValue = pd.DataFrame()
 
     while stopSearch == False:
         dataRow = data_frame.loc[dfDecrementer]
@@ -184,25 +182,35 @@ if __name__=="__main__":
     httpSession.mount("https://",retryTimeoutAdapter)
     httpSession.mount("http://",retryTimeoutAdapter)
 
-    # POST TO SERVER
+    # Generate sync pattern for retrieval
     syncPattern = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     timeStamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
     timeStamp = timeStamp + 'Z'
 
+    # POST TO SERVER
     postResult = PostTestVector(serviceEndpointTest, user, password, syncPattern, timeStamp, httpSession)
-    timeToPost = ConvertToMs(postResult.elapsed)
+    if(hasattr(postResult,'ok') and postResult.ok):
+        timeToPost = ConvertToMs(postResult.elapsed)
 
     # QUERY FROM SERVER
     getResult = GetFromUdl(serviceEndpointTest, httpSession, creds)
-    timeToGet = ConvertToMs(getResult.elapsed)
-    elsetsDataFrame = pd.DataFrame(getResult.json())
+    if(hasattr(getResult,'ok') and getResult.ok):
+        timeToGet = ConvertToMs(getResult.elapsed)
+        elsetsDataFrame = pd.DataFrame(getResult.json())
+        singleDataFrame = ScanDataFrameForOnSyncPattern(elsetsDataFrame, syncPattern)
 
     # PROCESS RESULTS
-    singleDataFrame = ScanDataFrameForOnSyncPattern(elsetsDataFrame, syncPattern)
-    if(singleDataFrame < 0):
+    if(singleDataFrame.empty == True):
         print("Find Frame on Sync Pattern Failure")
     else:
         timeDiffOnServerCreate = ConvertToMs(GetServerCreationLatency(timeStamp, singleDataFrame))
-        print(f"POST TIME: {timeToPost}")
-        print(f"GET TIME:  {timeToGet}")
-        print(f"TIME DIFF: {timeDiffOnServerCreate}")
+       
+    print(f"POST TIME: {timeToPost}")
+    print(f"GET TIME:  {timeToGet}")
+    print(f"TIME DIFF: {timeDiffOnServerCreate}")
+    outString = f"Run_Date: {timeStamp}\nSync_Pattern: {syncPattern}\nPost_Latency: {timeToPost}\nGet_Latency: {timeToGet}\nServer_Response_Latency: {timeDiffOnServerCreate}\n\n" 
+
+    # Write to log
+    f = open("logger.txt", "a")
+    f.write(outString);
+    f.close();
